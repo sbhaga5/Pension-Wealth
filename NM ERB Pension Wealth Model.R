@@ -27,13 +27,14 @@ colnames(SurvivalMale) <- c('Age','Years')
 SurvivalMale$Value <- 0
 #Join these tables to make the calculations easier
 SurvivalMale <- left_join(SurvivalMale,SurvivalRates,by = 'Age')
-SurvivalMale <- left_join(SurvivalMale,MaleMortality,by = 'Age')
+#MPValue2 is the cumulative product of the MP-2017 value for year 2033. We use it later so make life easy and calculate now
+SurvivalMale <- left_join(SurvivalMale,MaleMortality,by = 'Age') %>% group_by(Age) %>% mutate(MPValue2 = cumprod(1-lag(`2033`,2,default = 0)))
 SurvivalMale$Value <- ifelse(SurvivalMale$Age == 120, 1, 
                              ifelse((SurvivalMale$Age <= 57) & (SurvivalMale$Years == 2010),SurvivalMale$`Pub-2010 Employee Male Teachers`, 
                                     ifelse((SurvivalMale$Age > 57) & (SurvivalMale$Years == 2010),SurvivalMale$`Pub-2010 Non-disabled Male Teachers`*ScaleMultiple,
-                                           ifelse((SurvivalMale$Age <= 57) & (SurvivalMale$Years > 2010),SurvivalMale$`Pub-2010 Employee Male Teachers`*(1-SurvivalMale$'2033')^(SurvivalMale$Years - 2010),
+                                           ifelse((SurvivalMale$Age <= 57) & (SurvivalMale$Years > 2010),SurvivalMale$`Pub-2010 Employee Male Teachers`*SurvivalMale$MPValue2,
                                                   #This one is tricky. So this value is consistently 0.1. I basically made it dependent on the year rather than a cumulative sum since it is difficult to reset the sum for each age
-                                                  ifelse((SurvivalMale$Age > 57) & (SurvivalMale$Years > 2010),SurvivalMale$`Pub-2010 Non-disabled Male Teachers`*(1-SurvivalMale$'2033')^(SurvivalMale$Years - 2010),0)))))
+                                                  ifelse((SurvivalMale$Age > 57) & (SurvivalMale$Years > 2010),SurvivalMale$`Pub-2010 Non-disabled Male Teachers`*ScaleMultiple*SurvivalMale$MPValue2,0)))))
 
 #filter out the necessary variables
 SurvivalMale <- SurvivalMale %>% select('Age','Years','Value')
@@ -44,13 +45,14 @@ colnames(SurvivalFemale) <- c('Age','Years')
 SurvivalFemale$Value <- 0
 #Join these tables to make the calculations easier
 SurvivalFemale <- left_join(SurvivalFemale,SurvivalRates,by = 'Age')
-SurvivalFemale <- left_join(SurvivalFemale,FemaleMortality,by = 'Age')
+#MPValue2 is the cumulative product of the MP-2017 value for year 2033. We use it later so make life easy and calculate now
+SurvivalFemale <- left_join(SurvivalFemale,FemaleMortality,by = 'Age') %>% group_by(Age) %>% mutate(MPValue2 = cumprod(1-lag(`2033`,2,default = 0)))
 SurvivalFemale$Value <- ifelse(SurvivalFemale$Age == 120, 1, 
                                ifelse((SurvivalFemale$Age <= 57) & (SurvivalFemale$Years == 2010),SurvivalFemale$`Pub-2010 Employee Female Teachers`, 
                                       ifelse((SurvivalFemale$Age > 57) & (SurvivalFemale$Years == 2010),SurvivalFemale$`Pub-2010 Non-disabled Female Teachers`,
-                                             ifelse((SurvivalFemale$Age <= 57) & (SurvivalFemale$Years > 2010),SurvivalFemale$`Pub-2010 Employee Female Teachers`*(1-SurvivalFemale$'2033')^(SurvivalFemale$Years - 2010),
+                                             ifelse((SurvivalFemale$Age <= 57) & (SurvivalFemale$Years > 2010),SurvivalFemale$`Pub-2010 Employee Female Teachers`*SurvivalFemale$MPValue2,
                                                     #This one is tricky. So this value is consistently 0.1. I basically made it dependent on the year rather than a cumulative sum since it is difficult to reset the sum for each age
-                                                    ifelse((SurvivalFemale$Age > 57) & (SurvivalFemale$Years > 2010),SurvivalFemale$`Pub-2010 Non-disabled Female Teachers`*(1-SurvivalFemale$'2033')^(SurvivalFemale$Years - 2010),0)))))
+                                                    ifelse((SurvivalFemale$Age > 57) & (SurvivalFemale$Years > 2010),SurvivalFemale$`Pub-2010 Non-disabled Female Teachers`*SurvivalFemale$MPValue2,0)))))
 
 #filter out the necessary variables
 SurvivalFemale <- SurvivalFemale %>% select('Age','Years','Value')
