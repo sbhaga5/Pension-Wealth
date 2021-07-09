@@ -14,6 +14,19 @@ for(i in 1:nrow(model_inputs)){
   }
 }
 
+#NPV Function for later
+NPV = function(rate, cashflows) {
+  for(i in 1:length(cashflows)){
+    if(i == 1){
+      NPV <- cashflows[i]/((1+rate)^(i))
+    } else {
+      NPV <- NPV + cashflows[i]/((1+rate)^(i))
+    }
+  }
+  
+  return(NPV)
+}
+
 #These rates dont change so they're outside the function
 #Mortality Rates
 #2033 is the Age for the MP-2017 rates
@@ -57,6 +70,7 @@ SurvivalFemale$Value <- ifelse(SurvivalFemale$Age == 120, 1,
 #filter out the necessary variables
 SurvivalFemale <- SurvivalFemale %>% select('Age','Years','Value')
 
+HiringAge <- 25
 GetNormalCost <- function(HiringAge){
   #Change the sequence for the Age and YOS depending on the hiring age
   Age <- seq(HiringAge,120)
@@ -69,15 +83,22 @@ GetNormalCost <- function(HiringAge){
   SalaryData <- tibble(Age,YOS) %>%
     mutate(Salary = StartingSalary*cumprod(1+lag(TotalSalaryGrowth,default = 0)),
            IRSSalaryCap = pmin(Salary,IRSCompLimit),
-           CumulativeWage = cumsum(lag(Salary,default=0)),
            FinalAvgSalary = ifelse(YOS >= Vesting, rollmean(lag(Salary), k = FinAvgSalaryYears, fill = 0, align = "right"), 0),
            EEContrib = EE_Contrib*Salary, ERContrib = ER_Contrib*Salary,
-           DBERBalance = lag(cumsum(ERContrib*(1+Interest)),default = 0),
-           DBEEBalance = lag(cumsum(EEContrib*(1+Interest)),default = 0),
            ERVested = pmin(pmax(0+EnhER5*(YOS>=5)+EnhER610*(YOS-5)),1))
   
-  #SalaryData$CumulativeWage <- rollsum(lag(SalaryData$CumulativeWage*(1+ARR) + SalaryData$Salary,default = 0), k = 1, fill = 0, align = "right")
-  #SalaryData$CumulativeWage <- ifelse(YOS <= 1, SalaryData$CumulativeWage, lag(SalaryData$CumulativeWage*(1+ARR)+SalaryData$Salary,default = 0))
+  #Because Credit Interest != inflation, you cant use NPV formulae for DB Balance
+  for(i in 1:nrow(SalaryData)){
+    if(SalaryData$YOS[i] == 0){
+      SalaryData$DBEEBalance[i] <- 0
+      SalaryData$DBERBalance[i] <- 0
+      SalaryData$CumulativeWage[i] <- 0
+    } else {
+      SalaryData$DBEEBalance[i] <- SalaryData$DBEEBalance[i-1]*(1+Interest) + SalaryData$EEContrib[i-1]
+      SalaryData$DBERBalance[i] <- SalaryData$DBERBalance[i-1]*(1+Interest) + SalaryData$ERContrib[i-1]
+      SalaryData$CumulativeWage[i] <- SalaryData$CumulativeWage[i-1]*(1+ARR) + SalaryData$Salary[i-1]
+    }
+  }
   
   #Adjusted Mortality Rates
   #The adjusted values follow the same difference between Year and Hiring Age. So if you start in 2020 and are 25, then 26 at 2021, etc.
@@ -94,7 +115,7 @@ GetNormalCost <- function(HiringAge){
   AnnFactorData <- AdjustedValues %>% select(Age,AdjValue) %>%
     mutate(Prob = cumprod(1 - lag(AdjValue, default = 0)),
            DiscProb = Prob/(1+ARR)^(Age - HiringAge),
-           surv_DR_COLA = DiscProb * (1+COLA)^(Age-HiringAge),
+           surv_DR_COLA = DiscProb*(1+COLA)^(Age-HiringAge),
            AnnuityFactor = rev(cumsum(rev(surv_DR_COLA)))/surv_DR_COLA)
   
   #Replacement Rates
@@ -135,14 +156,14 @@ GetNormalCost <- function(HiringAge){
   RetentionRates <- read_excel(FileName, sheet = 'Retention Rates')
   SalaryData <- left_join(SalaryData,OptimumBenefit) 
   SalaryData <- left_join(SalaryData,RetentionRates) %>%
-    mutate(PenWealth = ifelse(YOS<Vesting,((DBERBalance*ERVested)+DBEEBalance),pmax(((DBERBalance*ERVested)+DBEEBalance),MaxBenefit)),
+    mutate(PenWealth = ifelse(YOS<Vesting,(DBERBalance*ERVested)+DBEEBalance,pmax((DBERBalance*ERVested)+DBEEBalance,MaxBenefit)),
            PVPenWealth = PenWealth/(1+ARR)^(Age-HiringAge),
            #Fiter out the NAs because when you change the Hiring age, there are NAs in separation probability,
            #or in Pension wealth
            PVCumWage = CumulativeWage/(1+ARR)^(Age-HiringAge)) %>% filter(!is.na(PVPenWealth),!is.na(SepProb))
   
   #Calc and return Normal Cost
-  NormalCost <- sum(SalaryData$SepProb*SalaryData$PVPenWealth) / sum(SalaryData$SepProb*SalaryData$PVCumWage)
+  NormalCost <- sum(SalaryData$SepProb*SalaryData$PVPenWealth)/sum(SalaryData$SepProb*SalaryData$PVCumWage)
   return(NormalCost)
 }
 
