@@ -112,11 +112,14 @@ GetNormalCost <- function(HiringAge){
   AdjustedValues <- left_join(AdjustedMale,AdjustedFemale) %>% mutate(AdjValue = (AdjMale+AdjFemale)/2)
   
   #Survival Probability and Annuity Factor
-  AnnFactorData <- AdjustedValues %>% select(Age,AdjValue) %>%
-    mutate(Prob = cumprod(1 - lag(AdjValue, default = 0)),
-           DiscProb = Prob/(1+ARR)^(Age - HiringAge),
-           surv_DR_COLA = DiscProb*(1+COLA)^(Age-HiringAge),
-           AnnuityFactor = rev(cumsum(rev(surv_DR_COLA)))/surv_DR_COLA)
+  AnnFactorData <- AdjustedValues %>% select(Age,AdjValue)
+  AnnFactorData$Prob <- cumprod(1 - lag(AnnFactorData$AdjValue, default = 0))
+  AnnFactorData$DiscProb <- AnnFactorData$Prob/(1+ARR)^(AnnFactorData$Age - HiringAge)
+  AnnFactorData$surv_DR_COLA <- AnnFactorData$DiscProb*(1+COLA)^(AnnFactorData$Age - HiringAge)
+  #mutate(Prob = cumprod(1 - AdjValue),
+  #       DiscProb = Prob/(1+ARR)^(Age - HiringAge),
+  #       surv_DR_COLA = DiscProb*(1+COLA)^(Age-HiringAge))
+  AnnFactorData$AnnuityFactor <- rev(cumsum(rev(AnnFactorData$surv_DR_COLA)))/AnnFactorData$surv_DR_COLA
   
   #Replacement Rates
   AFNormalRetAgeII <- AnnFactorData$AnnuityFactor[AnnFactorData$Age == NormalRetAgeII]
@@ -163,7 +166,7 @@ GetNormalCost <- function(HiringAge){
            PVCumWage = CumulativeWage/(1+ARR)^(Age-HiringAge)) %>% filter(!is.na(PVPenWealth),!is.na(SepProb))
   
   #Calc and return Normal Cost
-  NormalCost <- sum(SalaryData$SepProb*SalaryData$PVPenWealth)/sum(SalaryData$SepProb*SalaryData$PVCumWage)
+  NormalCost <- sum(SalaryData$SepProb*SalaryData$PVPenWealth) / sum(SalaryData$SepProb*SalaryData$PVCumWage)
   return(NormalCost)
 }
 
@@ -176,4 +179,4 @@ for(i in 1:nrow(SalaryHeadcountData)){
 NormalCostFinal <- sum(SalaryHeadcountData$NormalCost*SalaryHeadcountData$`Average Salary`*SalaryHeadcountData$Headcount) /
   sum(SalaryHeadcountData$`Average Salary`*SalaryHeadcountData$Headcount)
 print(NormalCostFinal)
-
+#
