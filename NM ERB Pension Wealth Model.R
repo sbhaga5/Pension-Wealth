@@ -71,7 +71,7 @@ SurvivalFemale$Value <- ifelse(SurvivalFemale$Age == 120, 1,
 SurvivalFemale <- SurvivalFemale %>% select('Age','Years','Value')
 
 HiringAge <- 25
-GetNormalCost <- function(HiringAge){
+GetNormalCost <- function(HiringAge, StartingSalary){
   #Change the sequence for the Age and YOS depending on the hiring age
   Age <- seq(HiringAge,120)
   YOS <- seq(0,(95-(HiringAge-25)))
@@ -173,7 +173,7 @@ GetNormalCost <- function(HiringAge){
 SalaryHeadcountData <- read_excel(FileName, sheet = 'Salary and Headcount')
 #This part requires a for loop since GetNormalCost cant be vectorized.
 for(i in 1:nrow(SalaryHeadcountData)){
-  SalaryHeadcountData$NormalCost[i] <- GetNormalCost(SalaryHeadcountData$`Hiring Age`[i])
+  SalaryHeadcountData$NormalCost[i] <- GetNormalCost(SalaryHeadcountData$`Hiring Age`[i], SalaryHeadcountData$`Starting Salary`[i])
 }
 #Calc the weighted average Normal Cost
 NormalCostFinal <- sum(SalaryHeadcountData$NormalCost*SalaryHeadcountData$`Average Salary`*SalaryHeadcountData$Headcount) /
