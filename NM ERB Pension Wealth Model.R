@@ -74,7 +74,6 @@ SeparationRates <- left_join(SeparationRates,FinalRatesReduced,by = 'Age')
 #Remove NAs
 SeparationRates[is.na(SeparationRates)] <- 0
 
-HiringAge <- 55
 GetNormalCost <- function(HiringAge, StartingSalary){
   #Filter out unecessary values
   SeparationRates <- SeparationRates %>% filter(Age - YOS == HiringAge) %>%
